@@ -1,12 +1,47 @@
+// SPDX-License-Identifier: MIT
+
 pragma solidity ^0.8.24;
 
 interface IERC20 {
     function transfer(address to, uint256 amount) external returns (bool);
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
 }
 
 contract KoshunPay {
+    error OnlyOwner();
+    error ZeroAddress();
+    error OnlyTourist();
+    error TourNotFound();
+    error TourInactive();
+    error AlreadyBooked();
+    error TransferFromFailed();
+    error TransferFailed();
+    error OrderNotFound();
+    error OnlyOrderOwner();
+    error NotPaid();
+    error AlreadyProcessed();
+    error TooEarly();
+    error Disputed();
+    error DisputeActive();
+    error DisputeExists();
+    error NotPending();
+    error NotApproved();
+    error NotDisputed();
+    error NewOwnerSelf();
+    error NewOwnerGos();
+    error NewOwnerGuide();
+    error NotCompleted();
+    error NotProcessed();
+    error NewOwnerHasOrder();
+    error OnlyGuide();
+    error OnlyGos();
+    error ZeroBalance();
+    error HeaderEmpty();
+    error DescEmpty();
+    error ImageEmpty();
+    error PriceZero();
+    error SeatsZero();
+
     struct Tour {
         address guide;
         string header;
@@ -56,13 +91,7 @@ contract KoshunPay {
     event GosAddressChanged(address indexed previousGos, address indexed newGos);
     event GuideRegistered(address indexed guide);
     event TourCreated(uint256 indexed tourId, address indexed guide, uint256 price, uint64 deadline, uint32 seatsTotal);
-    event PaymentReceived(
-        uint256 indexed orderId,
-        uint256 indexed tourId,
-        address indexed tourist,
-        uint256 amount,
-        uint64 releaseTime
-    );
+    event PaymentReceived(uint256 indexed orderId, uint256 indexed tourId, address indexed tourist, uint256 amount, uint64 releaseTime);
     event PaymentDistributed(
         uint256 indexed orderId,
         uint256 indexed tourId,
@@ -81,6 +110,10 @@ contract KoshunPay {
 
     uint64 public constant DEFAULT_TOUR_DURATION = 72 hours;
     uint64 public constant DEFAULT_RELEASE_DELAY = 72 hours;
+
+    uint256 private constant PERCENT_DENOM = 100;
+    uint256 private constant GUIDE_PERCENT = 85;
+    uint256 private constant GOS_PERCENT = 10;
 
     address public owner;
     IERC20 public immutable paymentToken;
@@ -107,14 +140,8 @@ contract KoshunPay {
     uint256 public gosBalance;
     uint256 public reserveBalance;
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "ONLY_OWNER");
-        _;
-    }
-
     constructor(address paymentTokenAddress, address gosAddress_) {
-        require(paymentTokenAddress != address(0), "TOKEN_ZERO");
-        require(gosAddress_ != address(0), "GOS_ZERO");
+        if (paymentTokenAddress == address(0) || gosAddress_ == address(0)) revert ZeroAddress();
         owner = msg.sender;
         paymentToken = IERC20(paymentTokenAddress);
         gosAddress = gosAddress_;
@@ -122,15 +149,17 @@ contract KoshunPay {
         emit GosAddressChanged(address(0), gosAddress_);
     }
 
-    function transferOwnership(address newOwner) external onlyOwner {
-        require(newOwner != address(0), "OWNER_ZERO");
+    function transferOwnership(address newOwner) external {
+        _requireOwner();
+        if (newOwner == address(0)) revert ZeroAddress();
         address prev = owner;
         owner = newOwner;
         emit OwnershipTransferred(prev, newOwner);
     }
 
-    function setGosAddress(address newGosAddress) external onlyOwner {
-        require(newGosAddress != address(0), "GOS_ZERO");
+    function setGosAddress(address newGosAddress) external {
+        _requireOwner();
+        if (newGosAddress == address(0)) revert ZeroAddress();
         address prev = gosAddress;
         gosAddress = newGosAddress;
         emit GosAddressChanged(prev, newGosAddress);
@@ -151,11 +180,11 @@ contract KoshunPay {
         uint256 price,
         uint32 seatsTotal
     ) external returns (uint256 tourId) {
-        require(bytes(header).length != 0, "HEADER_EMPTY");
-        require(bytes(description).length != 0, "DESC_EMPTY");
-        require(bytes(image).length != 0, "IMAGE_EMPTY");
-        require(price != 0, "PRICE_ZERO");
-        require(seatsTotal != 0, "SEATS_ZERO");
+        if (bytes(header).length == 0) revert HeaderEmpty();
+        if (bytes(description).length == 0) revert DescEmpty();
+        if (bytes(image).length == 0) revert ImageEmpty();
+        if (price == 0) revert PriceZero();
+        if (seatsTotal == 0) revert SeatsZero();
 
         tourId = ++tourCount;
         uint64 deadline = uint64(block.timestamp + DEFAULT_TOUR_DURATION);
@@ -199,7 +228,7 @@ contract KoshunPay {
         )
     {
         Tour storage t = tours[tourId];
-        require(t.guide != address(0), "TOUR_NOT_FOUND");
+        if (t.guide == address(0)) revert TourNotFound();
 
         guide = t.guide;
         header = t.header;
@@ -246,8 +275,7 @@ contract KoshunPay {
         )
     {
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
-        Dispute storage d = disputes[orderId];
+        if (o.owner == address(0)) revert OrderNotFound();
         tourId = o.tourId;
         orderOwner = o.owner;
         guide = o.guide;
@@ -257,47 +285,62 @@ contract KoshunPay {
         status = o.status;
         isProcessed = o.isProcessed;
         isDisputed = o.isDisputed;
-        disputeStatus = d.status;
+        disputeStatus = disputes[orderId].status;
     }
 
     function getMyActiveBookedOrderIds(address user) external view returns (uint256[] memory) {
         uint256[] storage ids = userOrderIds[user];
         uint256 count;
-        for (uint256 i; i < ids.length; i++) {
+        for (uint256 i; i < ids.length; ) {
             Order storage o = orders[ids[i]];
-            if (o.owner != user) continue;
-            if (o.status == OrderStatus.Refunded || o.status == OrderStatus.None) continue;
-            Tour storage t = tours[o.tourId];
-            if (!_isTourActive(t)) continue;
-            count++;
+            if (o.owner == user && o.status != OrderStatus.Refunded && o.status != OrderStatus.None) {
+                if (_isTourActive(tours[o.tourId])) {
+                    unchecked {
+                        count++;
+                    }
+                }
+            }
+            unchecked {
+                i++;
+            }
         }
+
         uint256[] memory out = new uint256[](count);
         uint256 j;
-        for (uint256 i; i < ids.length; i++) {
-            Order storage o = orders[ids[i]];
-            if (o.owner != user) continue;
-            if (o.status == OrderStatus.Refunded || o.status == OrderStatus.None) continue;
-            Tour storage t = tours[o.tourId];
-            if (!_isTourActive(t)) continue;
-            out[j++] = ids[i];
+        for (uint256 i; i < ids.length; ) {
+            uint256 id = ids[i];
+            Order storage o = orders[id];
+            if (o.owner == user && o.status != OrderStatus.Refunded && o.status != OrderStatus.None) {
+                if (_isTourActive(tours[o.tourId])) {
+                    out[j] = id;
+                    unchecked {
+                        j++;
+                    }
+                }
+            }
+            unchecked {
+                i++;
+            }
         }
         return out;
     }
 
     function pay(uint256 tourId) external returns (uint256 orderId) {
-        require(isTourist(msg.sender), "ONLY_TOURIST");
+        if (!isTourist(msg.sender)) revert OnlyTourist();
 
         Tour storage t = tours[tourId];
-        require(t.guide != address(0), "TOUR_NOT_FOUND");
-        require(_isTourActive(t), "TOUR_INACTIVE");
-        require(orderIdByTourAndOwner[tourId][msg.sender] == 0, "ALREADY_BOOKED");
+        if (t.guide == address(0)) revert TourNotFound();
+        if (!_isTourActive(t)) revert TourInactive();
+        if (orderIdByTourAndOwner[tourId][msg.sender] != 0) revert AlreadyBooked();
 
-        t.seatsRemaining -= 1;
+        unchecked {
+            t.seatsRemaining -= 1;
+        }
         if (t.seatsRemaining == 0) {
             t.deadline = uint64(block.timestamp);
         }
 
-        require(paymentToken.transferFrom(msg.sender, address(this), t.price), "TRANSFER_FROM_FAIL");
+        if (!paymentToken.transferFrom(msg.sender, address(this), t.price)) revert TransferFromFailed();
 
         orderId = ++orderCount;
         uint64 releaseTime = uint64(block.timestamp + DEFAULT_RELEASE_DELAY);
@@ -323,18 +366,19 @@ contract KoshunPay {
 
     function confirmPayment(uint256 orderId) external {
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
-        require(msg.sender == o.owner, "ONLY_ORDER_OWNER");
-        require(o.status == OrderStatus.Paid, "NOT_PAID");
-        require(!o.isProcessed, "ALREADY_PROCESSED");
-        require(block.timestamp >= o.releaseTime, "TOO_EARLY");
-        require(!o.isDisputed, "DISPUTED");
-        require(disputes[orderId].status == DisputeStatus.None, "DISPUTE_ACTIVE");
+        if (o.owner == address(0)) revert OrderNotFound();
+        if (msg.sender != o.owner) revert OnlyOrderOwner();
+        if (o.status != OrderStatus.Paid) revert NotPaid();
+        if (o.isProcessed) revert AlreadyProcessed();
+        if (block.timestamp < o.releaseTime) revert TooEarly();
+        if (o.isDisputed) revert Disputed();
+        if (disputes[orderId].status != DisputeStatus.None) revert DisputeActive();
 
-        _internalDistribute(orderId);
+        _internalDistribute(orderId, o);
     }
 
-    function confirmAll(uint256 maxCount) external onlyOwner returns (uint256 processed) {
+    function confirmAll(uint256 maxCount) external returns (uint256 processed) {
+        _requireOwner();
         uint256 i;
         while (i < pendingOrders.length && processed < maxCount) {
             uint256 orderId = pendingOrders[i];
@@ -344,26 +388,33 @@ contract KoshunPay {
                 continue;
             }
 
-            bool eligible = (o.status == OrderStatus.Paid) && (!o.isProcessed) && (!o.isDisputed)
-                && (disputes[orderId].status == DisputeStatus.None) && (block.timestamp >= o.releaseTime);
-
-            if (!eligible) {
-                i++;
+            if (o.status != OrderStatus.Paid || o.isProcessed || o.isDisputed) {
+                unchecked {
+                    i++;
+                }
+                continue;
+            }
+            if (disputes[orderId].status != DisputeStatus.None || block.timestamp < o.releaseTime) {
+                unchecked {
+                    i++;
+                }
                 continue;
             }
 
-            _internalDistribute(orderId);
-            processed++;
+            _internalDistribute(orderId, o);
+            unchecked {
+                processed++;
+            }
         }
     }
 
     function openDispute(uint256 orderId) external {
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
-        require(msg.sender == o.owner, "ONLY_ORDER_OWNER");
-        require(o.status == OrderStatus.Paid, "NOT_PAID");
-        require(!o.isProcessed, "ALREADY_PROCESSED");
-        require(disputes[orderId].status == DisputeStatus.None, "DISPUTE_EXISTS");
+        if (o.owner == address(0)) revert OrderNotFound();
+        if (msg.sender != o.owner) revert OnlyOrderOwner();
+        if (o.status != OrderStatus.Paid) revert NotPaid();
+        if (o.isProcessed) revert AlreadyProcessed();
+        if (disputes[orderId].status != DisputeStatus.None) revert DisputeExists();
 
         disputes[orderId] = Dispute({status: DisputeStatus.Pending, createdAt: uint64(block.timestamp), resolvedAt: 0});
         o.status = OrderStatus.Disputed;
@@ -372,12 +423,14 @@ contract KoshunPay {
         emit DisputeOpened(orderId, o.tourId, msg.sender);
     }
 
-    function resolveDispute(uint256 orderId, bool approve) external onlyOwner {
+    function resolveDispute(uint256 orderId, bool approve) external {
+        _requireOwner();
+
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
+        if (o.owner == address(0)) revert OrderNotFound();
 
         Dispute storage d = disputes[orderId];
-        require(d.status == DisputeStatus.Pending, "NOT_PENDING");
+        if (d.status != DisputeStatus.Pending) revert NotPending();
 
         d.resolvedAt = uint64(block.timestamp);
 
@@ -393,44 +446,44 @@ contract KoshunPay {
         emit DisputeResolved(orderId, DisputeStatus.Rejected);
 
         if (block.timestamp >= o.releaseTime) {
-            _internalDistribute(orderId);
+            _internalDistribute(orderId, o);
         }
     }
 
     function refund(uint256 orderId) external {
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
-        require(msg.sender == o.owner, "ONLY_ORDER_OWNER");
-        require(disputes[orderId].status == DisputeStatus.Approved, "NOT_APPROVED");
-        require(!o.isProcessed, "ALREADY_PROCESSED");
-        require(o.status == OrderStatus.Disputed, "NOT_DISPUTED");
+        if (o.owner == address(0)) revert OrderNotFound();
+        if (msg.sender != o.owner) revert OnlyOrderOwner();
+        if (disputes[orderId].status != DisputeStatus.Approved) revert NotApproved();
+        if (o.isProcessed) revert AlreadyProcessed();
+        if (o.status != OrderStatus.Disputed) revert NotDisputed();
 
         o.status = OrderStatus.Refunded;
         o.isProcessed = true;
         o.isDisputed = false;
         _removePending(orderId);
 
-        require(paymentToken.transfer(msg.sender, o.amount), "TRANSFER_FAIL");
+        if (!paymentToken.transfer(msg.sender, o.amount)) revert TransferFailed();
         emit RefundExecuted(orderId, msg.sender, o.amount);
     }
 
     function transferBooking(uint256 orderId, address newOwner) external {
-        require(newOwner != address(0), "NEW_OWNER_ZERO");
-        require(newOwner != msg.sender, "NEW_OWNER_SELF");
-        require(newOwner != gosAddress, "NEW_OWNER_GOS");
-        require(!isGuide[newOwner], "NEW_OWNER_GUIDE");
+        if (newOwner == address(0)) revert ZeroAddress();
+        if (newOwner == msg.sender) revert NewOwnerSelf();
+        if (newOwner == gosAddress) revert NewOwnerGos();
+        if (isGuide[newOwner]) revert NewOwnerGuide();
 
         Order storage o = orders[orderId];
-        require(o.owner != address(0), "ORDER_NOT_FOUND");
-        require(msg.sender == o.owner, "ONLY_ORDER_OWNER");
-        require(!o.isDisputed, "DISPUTED");
-        require(disputes[orderId].status == DisputeStatus.None, "DISPUTE_ACTIVE");
+        if (o.owner == address(0)) revert OrderNotFound();
+        if (msg.sender != o.owner) revert OnlyOrderOwner();
+        if (o.isDisputed) revert Disputed();
+        if (disputes[orderId].status != DisputeStatus.None) revert DisputeActive();
 
-        require(o.status == OrderStatus.Completed, "NOT_COMPLETED");
-        require(o.isProcessed, "NOT_PROCESSED");
+        if (o.status != OrderStatus.Completed) revert NotCompleted();
+        if (!o.isProcessed) revert NotProcessed();
 
         uint256 tourId = o.tourId;
-        require(orderIdByTourAndOwner[tourId][newOwner] == 0, "NEW_OWNER_HAS_ORDER");
+        if (orderIdByTourAndOwner[tourId][newOwner] != 0) revert NewOwnerHasOrder();
 
         address prevOwner = o.owner;
         o.owner = newOwner;
@@ -443,29 +496,34 @@ contract KoshunPay {
     }
 
     function withdrawGuide() external {
-        require(isGuide[msg.sender], "ONLY_GUIDE");
+        if (!isGuide[msg.sender]) revert OnlyGuide();
         uint256 amount = guideBalance[msg.sender];
-        require(amount != 0, "ZERO_BAL");
+        if (amount == 0) revert ZeroBalance();
         guideBalance[msg.sender] = 0;
-        require(paymentToken.transfer(msg.sender, amount), "TRANSFER_FAIL");
+        if (!paymentToken.transfer(msg.sender, amount)) revert TransferFailed();
         emit Withdrawn(msg.sender, amount);
     }
 
     function withdrawGos() external {
-        require(msg.sender == gosAddress, "ONLY_GOS");
+        if (msg.sender != gosAddress) revert OnlyGos();
         uint256 amount = gosBalance;
-        require(amount != 0, "ZERO_BAL");
+        if (amount == 0) revert ZeroBalance();
         gosBalance = 0;
-        require(paymentToken.transfer(msg.sender, amount), "TRANSFER_FAIL");
+        if (!paymentToken.transfer(msg.sender, amount)) revert TransferFailed();
         emit Withdrawn(msg.sender, amount);
     }
 
-    function withdrawReserve() external onlyOwner {
+    function withdrawReserve() external {
+        _requireOwner();
         uint256 amount = reserveBalance;
-        require(amount != 0, "ZERO_BAL");
+        if (amount == 0) revert ZeroBalance();
         reserveBalance = 0;
-        require(paymentToken.transfer(msg.sender, amount), "TRANSFER_FAIL");
+        if (!paymentToken.transfer(msg.sender, amount)) revert TransferFailed();
         emit Withdrawn(msg.sender, amount);
+    }
+
+    function _requireOwner() internal view {
+        if (msg.sender != owner) revert OnlyOwner();
     }
 
     function _isTourActive(Tour storage t) internal view returns (bool) {
@@ -493,28 +551,25 @@ contract KoshunPay {
         pendingIndexPlusOne[orderId] = 0;
     }
 
-    function _internalDistribute(uint256 orderId) internal {
-        Order storage o = orders[orderId];
-        require(o.status == OrderStatus.Paid, "NOT_PAID");
-        require(!o.isProcessed, "ALREADY_PROCESSED");
-        require(!o.isDisputed, "DISPUTED");
-        require(disputes[orderId].status == DisputeStatus.None, "DISPUTE_ACTIVE");
+    function _internalDistribute(uint256 orderId, Order storage o) internal {
+        if (o.status != OrderStatus.Paid) revert NotPaid();
+        if (o.isProcessed) revert AlreadyProcessed();
+        if (o.isDisputed) revert Disputed();
+        if (disputes[orderId].status != DisputeStatus.None) revert DisputeActive();
 
         o.status = OrderStatus.Completed;
         o.isProcessed = true;
         _removePending(orderId);
 
         uint256 total = o.amount;
-        uint256 guideAmount = (total * 85) / 100;
-        uint256 gosAmount = (total * 10) / 100;
+        uint256 guideAmount = (total * GUIDE_PERCENT) / PERCENT_DENOM;
+        uint256 gosAmount = (total * GOS_PERCENT) / PERCENT_DENOM;
         uint256 reserveAmount = total - guideAmount - gosAmount;
 
         guideBalance[o.guide] += guideAmount;
         gosBalance += gosAmount;
         reserveBalance += reserveAmount;
 
-        emit PaymentDistributed(
-            orderId, o.tourId, o.owner, o.guide, total, guideAmount, gosAmount, reserveAmount
-        );
+        emit PaymentDistributed(orderId, o.tourId, o.owner, o.guide, total, guideAmount, gosAmount, reserveAmount);
     }
 }
