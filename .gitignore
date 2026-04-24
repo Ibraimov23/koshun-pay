@@ -1,0 +1,5 @@
+.DS_Store
+.solcx/
+artifacts/
+__pycache__/
+.venv/
