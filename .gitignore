@@ -3,3 +3,6 @@
 artifacts/
 __pycache__/
 .venv/
+web/node_modules/
+web/.next/
+*.tsbuildinfo
