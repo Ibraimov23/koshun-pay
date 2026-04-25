@@ -32,7 +32,7 @@ export function Navbar({ onCooperation }: { onCooperation: () => void }) {
     <div className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/40 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-slate-900/40 shadow-[0_0_24px_rgba(16,185,129,0.35)] ring-1 ring-emerald-400/25 md:h-11 md:w-11">
+          <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-slate-900/40 md:h-11 md:w-11">
             <Image
               src="/koshun-logo.png"
               alt="Koshun logo"
@@ -75,7 +75,7 @@ export function Navbar({ onCooperation }: { onCooperation: () => void }) {
 
           {roleBadge ? (
             <div className="hidden items-center gap-2 rounded-full border border-slate-800 bg-slate-950/30 px-3 py-2 text-sm text-slate-200 md:flex">
-              <div className="h-5 w-5 overflow-hidden rounded-full shadow-[0_0_14px_rgba(16,185,129,0.45)]">
+              <div className="h-5 w-5 overflow-hidden rounded-full">
                 <Image src="/koshun-logo.png" alt="Koshun logo" width={20} height={20} className="h-full w-full object-cover saturate-125 contrast-110" />
               </div>
               <span>{roleBadge}</span>
@@ -94,7 +94,7 @@ export function Navbar({ onCooperation }: { onCooperation: () => void }) {
                 </span>
               </span>
             ) : (
-              "Connect Wallet"
+              "Connect"
             )}
           </Button>
 

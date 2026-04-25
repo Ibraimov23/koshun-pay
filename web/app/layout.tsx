@@ -6,10 +6,11 @@ import { AppShell } from "@/components/AppShell";
 export const metadata: Metadata = {
   title: "Koshun Pay",
   description: "Koshun Pay — токенизация туризма",
+  manifest: "/site.webmanifest",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png"
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png"
   }
 };
 

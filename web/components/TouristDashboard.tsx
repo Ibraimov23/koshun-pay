@@ -141,6 +141,7 @@ export function TouristDashboard() {
   const { push } = useToast();
   const {
     isConnected,
+    connect,
     roleBadge,
     networkOk,
     toursById,
@@ -261,18 +262,41 @@ export function TouristDashboard() {
 
                     {!hasOrder && (
                       <Button
-                        className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all"
+                        variant={!isConnected ? "ghost" : "primary"}
+                        className={
+                          "h-12 w-full rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all " +
+                          (!isConnected
+                            ? "border-slate-700 bg-slate-900/40 text-slate-400 shadow-slate-950/20 hover:bg-slate-900/40"
+                            : "bg-emerald-500 text-slate-950 shadow-emerald-500/10 hover:bg-emerald-400")
+                        }
                         onClick={async () => {
                           try {
+                            if (!isConnected) {
+                              await connect();
+                              return;
+                            }
                             await payForTour(t.id);
                             push({ title: "Success!", description: "Your adventure starts now.", kind: "success" });
                           } catch {
                             push({ title: "Error", description: "Payment failed or rejected.", kind: "error" });
                           }
                         }}
-                        disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0 || !t.active}
+                        disabled={
+                          (isConnected && !canBook) ||
+                          busy === `pay:${t.id}` ||
+                          t.seatsRemaining <= 0 ||
+                          !t.active
+                        }
                       >
-                        {busy === `pay:${t.id}` ? "Processing..." : !t.active ? "Not Available" : "Book Now"}
+                        {busy === `pay:${t.id}`
+                          ? "Processing..."
+                          : !isConnected
+                            ? "Connect Wallet"
+                            : !networkOk
+                              ? "Switch Network"
+                              : !t.active
+                                ? "Not Available"
+                                : "Book Now"}
                       </Button>
                     )}
 

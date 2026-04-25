@@ -301,8 +301,6 @@ export function useKoshunPay() {
       setIsTouristVerified(false);
       setIsGosVerified(false);
       setIsOwnerVerified(false);
-      setToursById({});
-      setHasLoadedTours(false);
       setMyOrderIds([]);
       setOrders({});
       setHasLoadedMyOrders(false);
@@ -314,6 +312,12 @@ export function useKoshunPay() {
     }
     void refreshAll();
   }, [isConnected, refreshAll]);
+
+  useEffect(() => {
+    if (!provider) return;
+    void refreshTokenMeta();
+    void refreshTours();
+  }, [provider, refreshTokenMeta, refreshTours]);
 
   useEffect(() => {
     if (!isConnected) return;

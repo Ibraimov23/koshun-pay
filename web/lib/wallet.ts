@@ -31,11 +31,7 @@ export async function getWalletState(): Promise<WalletState> {
   }
 
   const accounts: string[] = await ethereum.request({ method: "eth_accounts" });
-  if (!accounts || accounts.length === 0) {
-    return { provider: null, address: null, chainId: null };
-  }
-
   const provider = new BrowserProvider(ethereum);
   const network = await provider.getNetwork();
-  return { provider, address: accounts[0] ?? null, chainId: Number(network.chainId) };
+  return { provider, address: accounts?.[0] ?? null, chainId: Number(network.chainId) };
 }
