@@ -84,7 +84,7 @@ export default function TripsPage() {
         {isConnected && items.length === 0 && (
           <div className="rounded-[32px] border border-dashed border-slate-800 p-12 text-center">
             <span className="text-3xl mb-3 block">🎫</span>
-            <p className="text-sm text-slate-500">You haven't booked any trips yet.</p>
+            <p className="text-sm text-slate-500">You haven&apos;t booked any trips yet.</p>
           </div>
         )}
 
@@ -162,7 +162,7 @@ export default function TripsPage() {
       <Modal open={transferOpen} title="Gift this Trip" onClose={() => setTransferOpen(false)}>
         <div className="space-y-4 py-2">
           <div className="rounded-2xl bg-emerald-500/5 p-4 border border-emerald-500/10 text-xs text-emerald-200">
-            You can transfer your completed booking to another traveler's wallet address.
+            You can transfer your completed booking to another traveler&apos;s wallet address.
           </div>
           
           <div className="space-y-1">

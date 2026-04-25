@@ -114,7 +114,7 @@ function CreateTourModal({ open, onClose }: { open: boolean; onClose: () => void
         <Input placeholder="Tour Title (e.g. Son-Kul Magic)" className="rounded-2xl" value={s.header} onChange={(e: any) => setS((p) => ({ ...p, header: e.target.value }))} />
         
         <Textarea
-          placeholder="What's included?"
+          placeholder="What&apos;s included?"
           className="rounded-2xl min-h-[100px]"
           value={s.description}
           onChange={(e: any) => setS((p) => ({ ...p, description: e.target.value }))}

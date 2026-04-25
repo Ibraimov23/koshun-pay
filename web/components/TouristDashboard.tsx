@@ -35,6 +35,7 @@ function TourChatFab() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const { activeTours } = useKoshun();
+  const [sending, setSending] = useState(false);
   const [log, setLog] = useState<Array<{ who: "you" | "ai"; text: string }>>([
     { who: "ai", text: "Hi! Ask me anything about tours in Kyrgyzstan." }
   ]);
@@ -74,11 +75,50 @@ function TourChatFab() {
               />
               <button
                 className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950"
-                onClick={() => {
+                onClick={async () => {
                   const text = q.trim();
+                  if (!text || sending) return;
                   setQ("");
-                  setLog(p => [...p, { who: "you", text }, { who: "ai", text: "I'm checking that for you..." }]);
+                  setSending(true);
+                  setLog((p) => [...p, { who: "you", text }, { who: "ai", text: "Thinking..." }]);
+                  try {
+                    const res = await fetch("/api/ai-guide", {
+                      method: "POST",
+                      headers: { "content-type": "application/json" },
+                      body: JSON.stringify({ question: text, log, tips })
+                    });
+                    const data = (await res.json().catch(() => null)) as { answer?: string; error?: string } | null;
+                    if (!res.ok || !data?.answer) {
+                      throw new Error(data?.error || "AI request failed");
+                    }
+                    setLog((p) => {
+                      const next = [...p];
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i]?.who === "ai" && next[i]?.text === "Thinking...") {
+                          next[i] = { who: "ai", text: data.answer as string };
+                          return next;
+                        }
+                      }
+                      next.push({ who: "ai", text: data.answer as string });
+                      return next;
+                    });
+                  } catch {
+                    setLog((p) => {
+                      const next = [...p];
+                      for (let i = next.length - 1; i >= 0; i--) {
+                        if (next[i]?.who === "ai" && next[i]?.text === "Thinking...") {
+                          next[i] = { who: "ai", text: "Sorry — I couldn&apos;t reach AI right now. Try again." };
+                          return next;
+                        }
+                      }
+                      next.push({ who: "ai", text: "Sorry — I couldn&apos;t reach AI right now. Try again." });
+                      return next;
+                    });
+                  } finally {
+                    setSending(false);
+                  }
                 }}
+                disabled={sending}
               >
                 Send
               </button>
@@ -103,7 +143,7 @@ export function TouristDashboard() {
     isConnected,
     roleBadge,
     networkOk,
-    activeTours,
+    toursById,
     hasLoadedTours,
     myOrderIds,
     orders,
@@ -112,6 +152,10 @@ export function TouristDashboard() {
     busy,
     token
   } = useKoshun();
+
+  const allTours = useMemo(() => {
+    return Object.values(toursById).slice().sort((a, b) => b.id - a.id);
+  }, [toursById]);
 
   const canBook = isConnected && networkOk && roleBadge === "Tourist";
   const myOrderByTourId = useMemo(() => {
@@ -151,13 +195,13 @@ export function TouristDashboard() {
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : activeTours.length === 0 ? (
+        ) : allTours.length === 0 ? (
           <div className="flex h-60 flex-col items-center justify-center rounded-[32px] border border-dashed border-slate-800 text-slate-500 sm:col-span-2 lg:col-span-3">
             <span className="mb-2 text-2xl">🏔️</span>
             <p>No tours found. Check back later!</p>
           </div>
         ) : (
-          activeTours.map((t) => (
+          allTours.map((t) => (
             (() => {
               const myOrder = myOrderByTourId[t.id];
               const hasOrder = Boolean(myOrder);
@@ -189,8 +233,13 @@ export function TouristDashboard() {
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
 
-                    <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400 backdrop-blur-md">
-                      AI Verified
+                    <div
+                      className={
+                        "absolute left-4 top-4 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-widest backdrop-blur-md " +
+                        (t.active ? "text-emerald-400" : "text-slate-300")
+                      }
+                    >
+                      {t.active ? "Active" : "Expired"}
                     </div>
                   </div>
 
@@ -221,9 +270,9 @@ export function TouristDashboard() {
                             push({ title: "Error", description: "Payment failed or rejected.", kind: "error" });
                           }
                         }}
-                        disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0}
+                        disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0 || !t.active}
                       >
-                        {busy === `pay:${t.id}` ? "Processing..." : "Book Now"}
+                        {busy === `pay:${t.id}` ? "Processing..." : !t.active ? "Not Available" : "Book Now"}
                       </Button>
                     )}
 
