@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { formatUnits, MaxUint256, parseUnits } from "ethers";
+import { JsonRpcProvider, formatUnits, MaxUint256, parseUnits } from "ethers";
 import { getKoshunPayContractRO, getKoshunPayContractRW, getPaymentTokenContractRO, getPaymentTokenContractRW } from "@/lib/contracts";
-import { KOSHUNPAY_ADDRESS, SEPOLIA_CHAIN_ID } from "@/lib/config";
+import { KOSHUNPAY_ADDRESS, SEPOLIA_CHAIN_ID, SEPOLIA_RPC_URL } from "@/lib/config";
 import { useWallet } from "@/lib/useWallet";
 
 export type TokenMeta = { symbol: string; decimals: number };
@@ -66,8 +66,12 @@ export function useKoshunPay() {
   const { provider, address, chainId, isConnected, connect } = useWallet();
   const networkOk = useMemo(() => chainId === SEPOLIA_CHAIN_ID, [chainId]);
 
-  const contractRO = useMemo(() => (provider ? getKoshunPayContractRO(provider) : null), [provider]);
-  const tokenRO = useMemo(() => (provider ? getPaymentTokenContractRO(provider) : null), [provider]);
+  const roProvider = useMemo(() => {
+    return provider ?? new JsonRpcProvider(SEPOLIA_RPC_URL);
+  }, [provider]);
+
+  const contractRO = useMemo(() => getKoshunPayContractRO(roProvider), [roProvider]);
+  const tokenRO = useMemo(() => getPaymentTokenContractRO(roProvider), [roProvider]);
 
   const [busy, setBusy] = useState<string | null>(null);
   const [token, setToken] = useState<TokenMeta>({ symbol: "PYUSD", decimals: 6 });
@@ -314,10 +318,9 @@ export function useKoshunPay() {
   }, [isConnected, refreshAll]);
 
   useEffect(() => {
-    if (!provider) return;
     void refreshTokenMeta();
     void refreshTours();
-  }, [provider, refreshTokenMeta, refreshTours]);
+  }, [roProvider, refreshTokenMeta, refreshTours]);
 
   useEffect(() => {
     if (!isConnected) return;

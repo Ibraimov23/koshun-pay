@@ -1,5 +1,7 @@
 export const SEPOLIA_CHAIN_ID = 11155111;
 
+export const SEPOLIA_RPC_URL = process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL || "https://rpc.sepolia.org";
+
 export const KOSHUNPAY_ADDRESS = "0xD7695D77B2bc7676e17f29f0EB59E7952872eD03";
 export const PYUSDT_ADDRESS = "0xCaC524BcA292aaade2DF8A05cC58F0a65B1B3bB9";
 export const GOS_ADDRESS = "0x3a587aDe51F8B4F71B99ffc26f404d1aD83D67fF";
