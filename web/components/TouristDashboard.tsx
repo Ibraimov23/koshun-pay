@@ -6,6 +6,8 @@ import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { formatUnits } from "ethers";
 import { Button } from "@/components/Button";
+import { Modal } from "@/components/Modal";
+import { Input } from "@/components/Input";
 import { useKoshun } from "@/components/KoshunProvider";
 import { useToast } from "@/components/ToastProvider";
 import { shortAddr } from "@/lib/useKoshunPay";
@@ -139,9 +141,13 @@ function TourChatFab() {
 
 export function TouristDashboard() {
   const { push } = useToast();
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferOrderId, setTransferOrderId] = useState<number | null>(null);
+  const [newOwner, setNewOwner] = useState("");
   const {
     isConnected,
     connect,
+    address,
     roleBadge,
     networkOk,
     toursById,
@@ -150,6 +156,9 @@ export function TouristDashboard() {
     orders,
     payForTour,
     confirmPayment,
+    openDispute,
+    refund,
+    transferBooking,
     busy,
     token
   } = useKoshun();
@@ -159,18 +168,32 @@ export function TouristDashboard() {
   }, [toursById]);
 
   const canBook = isConnected && networkOk && roleBadge === "Tourist";
-  const myOrderByTourId = useMemo(() => {
-    const out: Record<number, typeof orders[number]> = {};
+  const refundedTourIds = useMemo(() => {
+    const out = new Set<number>();
+    if (!address) return out;
     for (const id of myOrderIds) {
       const order = orders[id];
       if (!order) continue;
+      if (order.owner.toLowerCase() !== address.toLowerCase()) continue;
+      if (order.status === 4) out.add(order.tourId);
+    }
+    return out;
+  }, [myOrderIds, orders, address]);
+  const myOrderByTourId = useMemo(() => {
+    const out: Record<number, typeof orders[number]> = {};
+    if (!address) return out;
+    for (const id of myOrderIds) {
+      const order = orders[id];
+      if (!order) continue;
+      if (order.owner.toLowerCase() !== address.toLowerCase()) continue;
+      if (order.status === 4) continue;
       const prev = out[order.tourId];
       if (!prev || order.id > prev.id) {
         out[order.tourId] = order;
       }
     }
     return out;
-  }, [myOrderIds, orders]);
+  }, [myOrderIds, orders, address]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-24 pt-4 md:pb-8">
@@ -208,6 +231,9 @@ export function TouristDashboard() {
               const hasOrder = Boolean(myOrder);
               const isPaid = myOrder?.status === 1;
               const isCompleted = myOrder?.status === 2;
+              const isDisputed = myOrder?.status === 3;
+              const isDisputePending = Boolean(myOrder && myOrder.disputeStatus === 1);
+              const isDisputeApproved = Boolean(myOrder && myOrder.disputeStatus === 2);
               const canConfirm = Boolean(
                 myOrder &&
                   isPaid &&
@@ -275,8 +301,10 @@ export function TouristDashboard() {
                         variant={!isConnected ? "ghost" : "primary"}
                         className={
                           "h-12 w-full rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all " +
-                          (!isConnected
-                            ? "border-slate-700 bg-slate-900/40 text-slate-400 shadow-slate-950/20 hover:bg-slate-900/40"
+                          (!isConnected || refundedTourIds.has(t.id)
+                            ? refundedTourIds.has(t.id)
+                              ? "inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition active:translate-y-px disabled:pointer-events-none disabled:opacity-50 border border-emerald-500/40 bg-emerald-500/90 text-slate-950 hover:bg-emerald-400 h-12 w-full rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all bg-emerald-500 text-slate-950 shadow-emerald-500/10 hover:bg-emerald-400 opacity-70"
+                              : "border-slate-700 bg-slate-800/60 text-slate-300 shadow-slate-950/20 hover:bg-slate-800/70"
                             : "bg-emerald-500 text-slate-950 shadow-emerald-500/10 hover:bg-emerald-400")
                         }
                         onClick={async () => {
@@ -310,35 +338,103 @@ export function TouristDashboard() {
                       </Button>
                     )}
 
-                    {hasOrder && isPaid && (
-                      <Button
-                        className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-60"
-                        onClick={async () => {
-                          if (!myOrder) return;
-                          try {
-                            await confirmPayment(myOrder.id);
-                            push({ title: "Payment Confirmed", description: "Funds were released by your confirmation.", kind: "success" });
-                          } catch {
-                            push({ title: "Cannot confirm yet", description: "Wait until release time, or check dispute status.", kind: "error" });
+                    {hasOrder && (isPaid || isDisputed) && (
+                      <div className="space-y-3">
+                        <Button
+                          className={
+                            "h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-60 " +
+                            (isDisputed ? "pointer-events-none opacity-60" : "")
                           }
-                        }}
-                        disabled={!networkOk || !canConfirm || !myOrder || busy === `confirm:${myOrder?.id}`}
-                      >
-                        {myOrder && busy === `confirm:${myOrder.id}` ? "Confirming..." : "Confirm Payment"}
-                      </Button>
+                          onClick={async () => {
+                            if (!myOrder) return;
+                            try {
+                              await confirmPayment(myOrder.id);
+                              push({ title: "Payment Confirmed", description: "Funds were released by your confirmation.", kind: "success" });
+                            } catch {
+                              push({ title: "Cannot confirm yet", description: "Wait until release time, or check dispute status.", kind: "error" });
+                            }
+                          }}
+                          disabled={
+                            !networkOk ||
+                            !myOrder ||
+                            isDisputed ||
+                            !canConfirm ||
+                            busy === `confirm:${myOrder?.id}`
+                          }
+                        >
+                          {myOrder && busy === `confirm:${myOrder.id}` ? "Confirming..." : "Confirm Payment"}
+                        </Button>
+
+                        {isPaid && (
+                          <Button
+                            variant="ghost"
+                            className="h-11 w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-200 hover:bg-amber-500/15"
+                            onClick={async () => {
+                              if (!myOrder) return;
+                              try {
+                                await openDispute(myOrder.id);
+                                push({ title: "Dispute opened", description: "Your dispute is now under review.", kind: "success" });
+                              } catch {
+                                push({ title: "Failed", description: "Could not open dispute.", kind: "error" });
+                              }
+                            }}
+                            disabled={!networkOk || !myOrder || busy === `dispute:${myOrder?.id}`}
+                          >
+                            {myOrder && busy === `dispute:${myOrder.id}` ? "Opening..." : "Open Dispute"}
+                          </Button>
+                        )}
+
+                        {isDisputed && isDisputePending && (
+                          <Button
+                            variant="ghost"
+                            className="h-11 w-full rounded-2xl border border-amber-500/40 bg-amber-500/10 text-amber-200 opacity-70"
+                            disabled
+                          >
+                            Under review
+                          </Button>
+                        )}
+
+                        {isDisputed && isDisputeApproved && (
+                          <Button
+                            className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-60"
+                            onClick={async () => {
+                              if (!myOrder) return;
+                              try {
+                                await refund(myOrder.id);
+                                push({ title: "Refund sent", description: "Funds were returned to your wallet.", kind: "success" });
+                              } catch {
+                                push({ title: "Failed", description: "Could not refund.", kind: "error" });
+                              }
+                            }}
+                            disabled={!networkOk || !myOrder || busy === `refund:${myOrder?.id}`}
+                          >
+                            {myOrder && busy === `refund:${myOrder.id}` ? "Processing..." : "Refund"}
+                          </Button>
+                        )}
+                      </div>
                     )}
 
                     {hasOrder && isCompleted && (
-                      <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-300">
-                        Trip completed
+                      <div className="space-y-3">
+                        <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-300">
+                          Trip completed
+                        </div>
+                        <Button
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition active:translate-y-px disabled:pointer-events-none disabled:opacity-50 border border-emerald-500/40 bg-emerald-500/90 text-slate-950 hover:bg-emerald-400 h-12 w-full rounded-2xl font-bold shadow-lg active:scale-[0.98] transition-all bg-emerald-500 text-slate-950 shadow-emerald-500/10 hover:bg-emerald-400"
+                          onClick={() => {
+                            if (!myOrder) return;
+                            setTransferOrderId(myOrder.id);
+                            setNewOwner("");
+                            setTransferOpen(true);
+                          }}
+                          disabled={!isConnected || !networkOk || !myOrder}
+                        >
+                          Transfer booking
+                        </Button>
                       </div>
                     )}
 
-                    {hasOrder && !isPaid && !isCompleted && (
-                      <div className="rounded-2xl border border-slate-700 bg-slate-800/40 px-4 py-3 text-center text-xs font-semibold text-slate-300">
-                        Booking already exists for this tour
-                      </div>
-                    )}
+                    {hasOrder && !isPaid && !isCompleted && null}
                   </div>
                 </motion.div>
               );
@@ -349,6 +445,41 @@ export function TouristDashboard() {
 
       {/* Кнопка чата - только для туристов */}
       {roleBadge === "Tourist" && <TourChatFab />}
+
+      <Modal open={transferOpen} title="Transfer booking" onClose={() => setTransferOpen(false)}>
+        <div className="space-y-4 py-2">
+          <div className="rounded-2xl bg-emerald-500/5 p-4 border border-emerald-500/10 text-xs text-emerald-200">
+            You can transfer your completed booking to another traveler&apos;s wallet address.
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Recipient Address</label>
+            <Input
+              placeholder="0x..."
+              className="rounded-2xl"
+              value={newOwner}
+              onChange={(e: any) => setNewOwner(e.target.value)}
+            />
+          </div>
+
+          <Button
+            className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/20"
+            onClick={async () => {
+              if (!transferOrderId) return;
+              try {
+                await transferBooking(transferOrderId, newOwner);
+                push({ title: "Success!", description: "Booking transferred.", kind: "success" });
+                setTransferOpen(false);
+              } catch {
+                push({ title: "Failed", description: "Could not transfer booking.", kind: "error" });
+              }
+            }}
+            disabled={!transferOrderId || !newOwner || busy === `transfer:${transferOrderId}` || !networkOk}
+          >
+            {transferOrderId && busy === `transfer:${transferOrderId}` ? "Transferring..." : "Send"}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

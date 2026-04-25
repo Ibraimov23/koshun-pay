@@ -453,6 +453,38 @@ export function useKoshunPay() {
     [provider, refreshMyOrders, refreshOrders, refreshTours, refreshBalances]
   );
 
+  const openDispute = useCallback(
+    async (orderId: number) => {
+      if (!provider) return;
+      setBusy(`dispute:${orderId}`);
+      try {
+        const contractRW = await getKoshunPayContractRW(provider);
+        const tx = await contractRW.openDispute(orderId);
+        await tx.wait();
+        await Promise.all([refreshMyOrders(), refreshOrders()]);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [provider, refreshMyOrders, refreshOrders]
+  );
+
+  const refund = useCallback(
+    async (orderId: number) => {
+      if (!provider) return;
+      setBusy(`refund:${orderId}`);
+      try {
+        const contractRW = await getKoshunPayContractRW(provider);
+        const tx = await contractRW.refund(orderId);
+        await tx.wait();
+        await Promise.all([refreshMyOrders(), refreshOrders(), refreshTours(), refreshWalletBalance()]);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [provider, refreshMyOrders, refreshOrders, refreshTours, refreshWalletBalance]
+  );
+
   return {
     provider,
     address,
@@ -500,6 +532,8 @@ export function useKoshunPay() {
     withdrawReserve,
     transferBooking,
     confirmPayment,
+    openDispute,
+    refund,
 
     contracts: {
       KOSHUNPAY_ADDRESS
