@@ -44,7 +44,8 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
 
     if (process.env.VERCEL) {
-      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      const token = process.env.BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN_READ_WRITE_TOKEN;
+      if (!token) {
         return NextResponse.json(
           { error: "BLOB_READ_WRITE_TOKEN is not configured" },
           { status: 500 }
@@ -53,7 +54,8 @@ export async function POST(request: Request) {
 
       const blob = await put(`tours/${fileName}`, buffer, {
         access: "public",
-        contentType: file.type
+        contentType: file.type,
+        token
       });
       return NextResponse.json({ path: blob.url }, { status: 200 });
     }
