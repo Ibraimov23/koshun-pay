@@ -133,8 +133,8 @@ export function TouristDashboard() {
       {/* Шапка секции - Убрали лишнее, добавили акцент */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Explore</h1>
-          <p className="text-sm text-slate-400">Hand-picked adventures for you</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Discover Kyrgyzstan with Confidence</h1>
+          <p className="text-sm text-slate-400">Verified adventures protected by smart contracts. Explore the hidden gems of the Tien Shan mountains with an AI-powered guide</p>
         </div>
         {!isConnected && (
           <Button variant="pill" onClick={connect} className="bg-emerald-500 text-slate-950">

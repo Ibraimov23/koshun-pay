@@ -1,10 +1,16 @@
 import "./globals.css";
 import type { ReactNode } from "react";
+import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Koshun Pay",
-  description: "Koshun Pay — токенизация туризма"
+  description: "Koshun Pay — токенизация туризма",
+  icons: {
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/favicon.png"
+  }
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
