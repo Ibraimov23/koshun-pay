@@ -1,6 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { put } from "@vercel/blob";
+
+export const runtime = "nodejs";
 
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
@@ -38,16 +41,33 @@ export async function POST(request: Request) {
 
     const now = Date.now();
     const fileName = `${sanitizeBaseName(file.name)}-${now}${extFor(file)}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (process.env.VERCEL) {
+      if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        return NextResponse.json(
+          { error: "BLOB_READ_WRITE_TOKEN is not configured" },
+          { status: 500 }
+        );
+      }
+
+      const blob = await put(`tours/${fileName}`, buffer, {
+        access: "public",
+        contentType: file.type
+      });
+      return NextResponse.json({ path: blob.url }, { status: 200 });
+    }
+
     const relPath = `/tours/${fileName}`;
     const uploadDir = path.join(process.cwd(), "public", "tours");
     const absPath = path.join(uploadDir, fileName);
-
     await mkdir(uploadDir, { recursive: true });
-    const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(absPath, buffer);
 
     return NextResponse.json({ path: relPath }, { status: 200 });
-  } catch {
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  } catch (err) {
+    console.error("[upload-tour-image] failed", err);
+    const msg = err instanceof Error ? err.message : "Upload failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
