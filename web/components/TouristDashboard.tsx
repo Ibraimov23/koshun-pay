@@ -247,16 +247,26 @@ export function TouristDashboard() {
                   {/* Контент карточки */}
                   <div className="p-5">
                     <h3 className="mb-1 truncate text-lg font-bold text-white">{t.header}</h3>
-                    <p className="mb-4 text-xs text-slate-500 font-mono">by {shortAddr(t.guide)}</p>
+                    <div className="mb-4 flex flex-col gap-1">
+                      <p className="text-xs text-slate-500 font-mono">by {shortAddr(t.guide)}</p>
+                      {t.phone ? (
+                        <a
+                          href={`tel:${t.phone}`}
+                          className="text-xs text-slate-300 hover:text-slate-100"
+                        >
+                          {t.phone}
+                        </a>
+                      ) : null}
+                    </div>
 
                     <div className="mb-5 flex items-end justify-between">
                       <div>
                         <span className="text-2xl font-black text-white">{formatMoney(formatUnits(t.price, token.decimals))}</span>
                         <span className="ml-1 text-xs font-bold text-emerald-500">{token.symbol}</span>
                       </div>
-                      <div className="text-right text-[10px] text-slate-400 uppercase tracking-tighter leading-tight">
-                        <p>{t.seatsRemaining} seats left</p>
-                        <p>{new Date(t.deadline * 1000).toLocaleDateString()}</p>
+                      <div className="text-right text-xs text-slate-300 leading-snug">
+                        <p className="font-medium">{t.seatsRemaining} seats left</p>
+                        <p className="text-slate-400">{new Date(t.deadline * 1000).toLocaleDateString()}</p>
                       </div>
                     </div>
 
