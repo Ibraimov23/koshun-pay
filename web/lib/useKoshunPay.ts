@@ -412,6 +412,22 @@ export function useKoshunPay() {
     [provider, refreshMyOrders, refreshOrders]
   );
 
+  const confirmPayment = useCallback(
+    async (orderId: number) => {
+      if (!provider) return;
+      setBusy(`confirm:${orderId}`);
+      try {
+        const contractRW = await getKoshunPayContractRW(provider);
+        const tx = await contractRW.confirmPayment(orderId);
+        await tx.wait();
+        await Promise.all([refreshMyOrders(), refreshOrders(), refreshTours(), refreshBalances()]);
+      } finally {
+        setBusy(null);
+      }
+    },
+    [provider, refreshMyOrders, refreshOrders, refreshTours, refreshBalances]
+  );
+
   return {
     provider,
     address,
@@ -456,6 +472,7 @@ export function useKoshunPay() {
     withdrawGuide,
     withdrawGos,
     transferBooking,
+    confirmPayment,
 
     contracts: {
       KOSHUNPAY_ADDRESS

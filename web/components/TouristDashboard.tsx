@@ -9,6 +9,7 @@ import { Button } from "@/components/Button";
 import { useKoshun } from "@/components/KoshunProvider";
 import { useToast } from "@/components/ToastProvider";
 import { shortAddr } from "@/lib/useKoshunPay";
+import { resolveTourImageSrc } from "@/lib/tourImage";
 
 function formatMoney(x: string) {
   const n = Number(x);
@@ -98,9 +99,34 @@ function TourChatFab() {
 
 export function TouristDashboard() {
   const { push } = useToast();
-  const { isConnected, connect, roleBadge, networkOk, activeTours, hasLoadedTours, payForTour, busy, token } = useKoshun();
+  const {
+    isConnected,
+    connect,
+    roleBadge,
+    networkOk,
+    activeTours,
+    hasLoadedTours,
+    myOrderIds,
+    orders,
+    payForTour,
+    confirmPayment,
+    busy,
+    token
+  } = useKoshun();
 
   const canBook = isConnected && networkOk && roleBadge === "Tourist";
+  const myOrderByTourId = useMemo(() => {
+    const out: Record<number, typeof orders[number]> = {};
+    for (const id of myOrderIds) {
+      const order = orders[id];
+      if (!order) continue;
+      const prev = out[order.tourId];
+      if (!prev || order.id > prev.id) {
+        out[order.tourId] = order;
+      }
+    }
+    return out;
+  }, [myOrderIds, orders]);
 
   return (
     <div className="mx-auto max-w-5xl px-4 pb-24 pt-4 md:pb-8">
@@ -138,62 +164,108 @@ export function TouristDashboard() {
           </div>
         ) : (
           activeTours.map((t) => (
-            <motion.div
-              key={t.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900/20 transition-all hover:border-emerald-500/30 hover:bg-slate-900/40 shadow-xl"
-            >
-              {/* Блок с картинкой - теперь поддерживает локальные пути */}
-              <div className="relative h-52">
-                <img 
-                  // Если в блокчейне только имя файла (напр. 'nature.jpg'), берем его из папки /tours/
-                  src={t.image.startsWith('http') ? t.image : `/tours/${t.image}`} 
-                  alt={t.header}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80';
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
-                
-                <div className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400 backdrop-blur-md border border-white/10">
-                  AI Verified
-                </div>
-              </div>
+            (() => {
+              const myOrder = myOrderByTourId[t.id];
+              const hasOrder = Boolean(myOrder);
+              const isPaid = myOrder?.status === 1;
+              const isCompleted = myOrder?.status === 2;
+              const canConfirm = Boolean(
+                myOrder &&
+                  isPaid &&
+                  !myOrder.isDisputed &&
+                  !myOrder.isProcessed
+              );
 
-              {/* Контент карточки */}
-              <div className="p-5">
-                <h3 className="mb-1 truncate text-lg font-bold text-white">{t.header}</h3>
-                <p className="mb-4 text-xs text-slate-500 font-mono">by {shortAddr(t.guide)}</p>
-
-                <div className="mb-5 flex items-end justify-between">
-                  <div>
-                    <span className="text-2xl font-black text-white">{formatMoney(formatUnits(t.price, token.decimals))}</span>
-                    <span className="ml-1 text-xs font-bold text-emerald-500">{token.symbol}</span>
-                  </div>
-                  <div className="text-right text-[10px] text-slate-400 uppercase tracking-tighter leading-tight">
-                    <p>{t.seatsRemaining} seats left</p>
-                    <p>{new Date(t.deadline * 1000).toLocaleDateString()}</p>
-                  </div>
-                </div>
-
-                <Button
-                  className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all"
-                  onClick={async () => {
-                    try {
-                      await payForTour(t.id);
-                      push({ title: "Success!", description: "Your adventure starts now.", kind: "success" });
-                    } catch {
-                      push({ title: "Error", description: "Payment failed or rejected.", kind: "error" });
-                    }
-                  }}
-                  disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0}
+              return (
+                <motion.div
+                  key={t.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900/20 transition-all hover:border-emerald-500/30 hover:bg-slate-900/40 shadow-xl"
                 >
-                  {busy === `pay:${t.id}` ? "Processing..." : "Book Now"}
-                </Button>
-              </div>
-            </motion.div>
+                  {/* Блок с картинкой - теперь поддерживает локальные пути */}
+                  <div className="relative h-52">
+                    <img
+                      src={resolveTourImageSrc(t.image)}
+                      alt={t.header}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80";
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+
+                    <div className="absolute left-4 top-4 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400 backdrop-blur-md">
+                      AI Verified
+                    </div>
+                  </div>
+
+                  {/* Контент карточки */}
+                  <div className="p-5">
+                    <h3 className="mb-1 truncate text-lg font-bold text-white">{t.header}</h3>
+                    <p className="mb-4 text-xs text-slate-500 font-mono">by {shortAddr(t.guide)}</p>
+
+                    <div className="mb-5 flex items-end justify-between">
+                      <div>
+                        <span className="text-2xl font-black text-white">{formatMoney(formatUnits(t.price, token.decimals))}</span>
+                        <span className="ml-1 text-xs font-bold text-emerald-500">{token.symbol}</span>
+                      </div>
+                      <div className="text-right text-[10px] text-slate-400 uppercase tracking-tighter leading-tight">
+                        <p>{t.seatsRemaining} seats left</p>
+                        <p>{new Date(t.deadline * 1000).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    {!hasOrder && (
+                      <Button
+                        className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all"
+                        onClick={async () => {
+                          try {
+                            await payForTour(t.id);
+                            push({ title: "Success!", description: "Your adventure starts now.", kind: "success" });
+                          } catch {
+                            push({ title: "Error", description: "Payment failed or rejected.", kind: "error" });
+                          }
+                        }}
+                        disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0}
+                      >
+                        {busy === `pay:${t.id}` ? "Processing..." : "Book Now"}
+                      </Button>
+                    )}
+
+                    {hasOrder && isPaid && (
+                      <Button
+                        className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all disabled:opacity-60"
+                        onClick={async () => {
+                          if (!myOrder) return;
+                          try {
+                            await confirmPayment(myOrder.id);
+                            push({ title: "Payment Confirmed", description: "Funds were released by your confirmation.", kind: "success" });
+                          } catch {
+                            push({ title: "Cannot confirm yet", description: "Wait until release time, or check dispute status.", kind: "error" });
+                          }
+                        }}
+                        disabled={!networkOk || !canConfirm || !myOrder || busy === `confirm:${myOrder?.id}`}
+                      >
+                        {myOrder && busy === `confirm:${myOrder.id}` ? "Confirming..." : "Confirm Payment"}
+                      </Button>
+                    )}
+
+                    {hasOrder && isCompleted && (
+                      <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-300">
+                        Trip completed. See full history in My Trips.
+                      </div>
+                    )}
+
+                    {hasOrder && !isPaid && !isCompleted && (
+                      <div className="rounded-2xl border border-slate-700 bg-slate-800/40 px-4 py-3 text-center text-xs font-semibold text-slate-300">
+                        Booking already exists for this tour.
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })()
           ))
         )}
       </div>

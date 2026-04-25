@@ -370,7 +370,6 @@ contract KoshunPay {
         if (msg.sender != o.owner) revert OnlyOrderOwner();
         if (o.status != OrderStatus.Paid) revert NotPaid();
         if (o.isProcessed) revert AlreadyProcessed();
-        if (block.timestamp < o.releaseTime) revert TooEarly();
         if (o.isDisputed) revert Disputed();
         if (disputes[orderId].status != DisputeStatus.None) revert DisputeActive();
 
