@@ -1,3 +1,5 @@
+/*<@Nursultan2026-04-25> */
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -11,17 +13,18 @@ import { shortAddr } from "@/lib/useKoshunPay";
 function formatMoney(x: string) {
   const n = Number(x);
   if (!Number.isFinite(n)) return x;
-  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+// Улучшенный скелетон с более сильным скруглением
 function SkeletonCard() {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40 backdrop-blur">
-      <div className="h-44 animate-pulse bg-slate-800/60" />
-      <div className="space-y-3 p-4">
-        <div className="h-4 w-2/3 animate-pulse rounded bg-slate-800/60" />
-        <div className="h-3 w-1/2 animate-pulse rounded bg-slate-800/60" />
-        <div className="h-9 w-full animate-pulse rounded-2xl bg-slate-800/60" />
+    <div className="overflow-hidden rounded-[32px] border border-slate-800 bg-slate-900/20 backdrop-blur">
+      <div className="h-52 animate-pulse bg-slate-800/40" />
+      <div className="space-y-4 p-5">
+        <div className="h-5 w-2/3 animate-pulse rounded-full bg-slate-800/40" />
+        <div className="h-4 w-full animate-pulse rounded-full bg-slate-800/40" />
+        <div className="h-12 w-full animate-pulse rounded-[20px] bg-slate-800/40" />
       </div>
     </div>
   );
@@ -32,78 +35,62 @@ function TourChatFab() {
   const [q, setQ] = useState("");
   const { activeTours } = useKoshun();
   const [log, setLog] = useState<Array<{ who: "you" | "ai"; text: string }>>([
-    { who: "ai", text: "Ask about tours: availability, pricing, booking steps." }
+    { who: "ai", text: "Hi! Ask me anything about tours in Kyrgyzstan." }
   ]);
 
   const tips = useMemo(() => {
     const n = activeTours.length;
-    return n ? `There are ${n} active tours right now.` : "No active tours yet.";
+    return n ? `${n} tours available today.` : "Looking for new adventures...";
   }, [activeTours.length]);
 
   return (
-    <div className="fixed bottom-5 right-5 z-30">
-      {open ? (
-        <div className="w-[22rem] overflow-hidden rounded-3xl border border-slate-800 bg-slate-950/50 shadow-[0_0_0_1px_rgba(15,23,42,0.7),0_24px_60px_rgba(2,6,23,0.75)] backdrop-blur">
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3">
-            <div className="text-sm font-semibold text-slate-100">AI Assistant</div>
-            <button
-              className="rounded-full border border-slate-800 bg-slate-900/40 px-3 py-1 text-xs text-slate-200 hover:bg-slate-900/60"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
+    <div className="fixed bottom-24 right-5 z-50 md:bottom-8">
+      {open && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="mb-4 w-[calc(100vw-40px)] max-w-[350px] overflow-hidden rounded-[32px] border border-white/10 bg-slate-950/80 shadow-2xl backdrop-blur-xl"
+        >
+          <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+            <div className="font-semibold text-white">AI Guide</div>
+            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white">✕</button>
           </div>
-          <div className="max-h-72 space-y-2 overflow-auto p-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs text-slate-300">
-              {tips}
-            </div>
+          <div className="max-h-[300px] space-y-3 overflow-auto p-5">
+            <div className="rounded-2xl bg-white/5 p-3 text-xs text-emerald-400">{tips}</div>
             {log.map((m, i) => (
-              <div
-                key={i}
-                className={[
-                  "rounded-2xl px-3 py-2 text-sm",
-                  m.who === "ai"
-                    ? "border border-slate-800 bg-slate-900/40 text-slate-200"
-                    : "bg-emerald-500/15 text-emerald-100"
-                ].join(" ")}
-              >
+              <div key={i} className={`rounded-2xl px-4 py-2 text-sm ${m.who === "ai" ? "bg-white/5 text-slate-200" : "bg-emerald-600 text-white ml-8"}`}>
                 {m.text}
               </div>
             ))}
           </div>
-          <div className="border-t border-slate-800 p-3">
-            <div className="flex gap-2">
+          <div className="p-4 pt-0">
+            <div className="flex gap-2 rounded-2xl bg-white/5 p-1">
               <input
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950/30 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-emerald-400/70 focus:ring-2 focus:ring-emerald-400/15"
-                placeholder="Ask a tour question…"
+                className="w-full bg-transparent px-3 py-2 text-sm outline-none placeholder:text-slate-500"
+                placeholder="Ask something..."
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
               <button
-                className="rounded-2xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-                disabled={!q.trim()}
+                className="rounded-xl bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950"
                 onClick={() => {
                   const text = q.trim();
                   setQ("");
-                  setLog((p) => [
-                    ...p,
-                    { who: "you", text },
-                    { who: "ai", text: "I can help with tours only. Check price, seats, and then press Book Now." }
-                  ]);
+                  setLog(p => [...p, { who: "you", text }, { who: "ai", text: "I'm checking that for you..." }]);
                 }}
               >
                 Send
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </motion.div>
+      )}
 
       <button
-        className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm font-medium text-slate-200 shadow-lg backdrop-blur hover:bg-slate-950/60"
-        onClick={() => setOpen((v) => !v)}
+        className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20 transition-transform active:scale-90"
+        onClick={() => setOpen(!open)}
       >
-        AI Chat
+        <span className="text-xl">💬</span>
       </button>
     </div>
   );
@@ -116,26 +103,28 @@ export function TouristDashboard() {
   const canBook = isConnected && networkOk && roleBadge === "Tourist";
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-end justify-between gap-4">
+    <div className="mx-auto max-w-5xl px-4 pb-24 pt-4 md:pb-8">
+      {/* Шапка секции - Убрали лишнее, добавили акцент */}
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <div className="text-xl font-semibold text-slate-100">Home</div>
-          <div className="mt-1 text-sm text-slate-400">Discover verified tours. Book with on-chain escrow.</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Explore</h1>
+          <p className="text-sm text-slate-400">Hand-picked adventures for you</p>
         </div>
-        {!isConnected ? (
-          <Button variant="pill" onClick={connect}>
+        {!isConnected && (
+          <Button variant="pill" onClick={connect} className="bg-emerald-500 text-slate-950">
             Connect
           </Button>
-        ) : null}
+        )}
       </div>
 
-      {!networkOk && isConnected ? (
-        <div className="rounded-3xl border border-slate-800 bg-slate-950/40 px-4 py-3 text-sm text-slate-200 backdrop-blur">
-          Switch to Sepolia to continue.
+      {!networkOk && isConnected && (
+        <div className="mb-6 rounded-2xl bg-red-500/10 p-4 text-center text-sm text-red-400 border border-red-500/20">
+          Please switch to Sepolia Network
         </div>
-      ) : null}
+      )}
 
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Сетка туров - Более "Приложенческий" вид */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {!hasLoadedTours ? (
           <>
             <SkeletonCard />
@@ -143,66 +132,65 @@ export function TouristDashboard() {
             <SkeletonCard />
           </>
         ) : activeTours.length === 0 ? (
-          <div className="rounded-3xl border border-slate-800 bg-slate-950/30 p-6 text-sm text-slate-300 sm:col-span-2 lg:col-span-3">
-            No tours available.
+          <div className="flex h-60 flex-col items-center justify-center rounded-[32px] border border-dashed border-slate-800 text-slate-500 sm:col-span-2 lg:col-span-3">
+            <span className="mb-2 text-2xl">🏔️</span>
+            <p>No tours found. Check back later!</p>
           </div>
         ) : (
           activeTours.map((t) => (
             <motion.div
               key={t.id}
-              whileHover={{ y: -2 }}
-              transition={{ type: "spring", stiffness: 420, damping: 30 }}
-              className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/40 shadow-[0_0_0_1px_rgba(15,23,42,0.6),0_18px_44px_rgba(2,6,23,0.65)] backdrop-blur"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group overflow-hidden rounded-[32px] border border-white/5 bg-slate-900/20 transition-all hover:border-emerald-500/30 hover:bg-slate-900/40 shadow-xl"
             >
-              <div className="relative h-44 overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-cover bg-center"
-                  style={{
-                    backgroundImage: t.image
-                      ? `url(${t.image})`
-                      : "radial-gradient(1200px 400px at 20% 10%, rgba(16,185,129,0.25), transparent 55%), radial-gradient(900px 300px at 80% 30%, rgba(148,163,184,0.15), transparent 60%), linear-gradient(135deg, rgba(2,6,23,0.8), rgba(15,23,42,0.8))"
+              {/* Блок с картинкой - теперь поддерживает локальные пути */}
+              <div className="relative h-52">
+                <img 
+                  // Если в блокчейне только имя файла (напр. 'nature.jpg'), берем его из папки /tours/
+                  src={t.image.startsWith('http') ? t.image : `/tours/${t.image}`} 
+                  alt={t.header}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&q=80';
                   }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent" />
-                <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200 backdrop-blur">
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent" />
+                
+                <div className="absolute left-4 top-4 rounded-full bg-black/40 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400 backdrop-blur-md border border-white/10">
                   AI Verified
-                </div>
-                <div className="absolute bottom-3 left-3 right-3">
-                  <div className="truncate text-sm font-semibold text-slate-100">
-                    #{t.id} {t.header}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-300">
-                    Guide <span className="font-mono">{shortAddr(t.guide)}</span>
-                  </div>
                 </div>
               </div>
 
-              <div className="space-y-4 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-slate-100">
-                    {formatMoney(formatUnits(t.price, token.decimals))}
-                  </div>
-                  <div className="text-sm text-slate-400">{token.symbol}</div>
-                </div>
-                <div className="flex items-center justify-between gap-3 text-xs text-slate-400">
+              {/* Контент карточки */}
+              <div className="p-5">
+                <h3 className="mb-1 truncate text-lg font-bold text-white">{t.header}</h3>
+                <p className="mb-4 text-xs text-slate-500 font-mono">by {shortAddr(t.guide)}</p>
+
+                <div className="mb-5 flex items-end justify-between">
                   <div>
-                    Seats <span className="text-slate-200">{t.seatsRemaining}</span>/{t.seatsTotal}
+                    <span className="text-2xl font-black text-white">{formatMoney(formatUnits(t.price, token.decimals))}</span>
+                    <span className="ml-1 text-xs font-bold text-emerald-500">{token.symbol}</span>
                   </div>
-                  <div>{new Date(t.deadline * 1000).toLocaleDateString()}</div>
+                  <div className="text-right text-[10px] text-slate-400 uppercase tracking-tighter leading-tight">
+                    <p>{t.seatsRemaining} seats left</p>
+                    <p>{new Date(t.deadline * 1000).toLocaleDateString()}</p>
+                  </div>
                 </div>
+
                 <Button
-                  className="w-full"
+                  className="h-12 w-full rounded-2xl bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/10 hover:bg-emerald-400 active:scale-[0.98] transition-all"
                   onClick={async () => {
                     try {
                       await payForTour(t.id);
-                      push({ title: "Booked", description: `Order created for Tour #${t.id}`, kind: "success" });
+                      push({ title: "Success!", description: "Your adventure starts now.", kind: "success" });
                     } catch {
-                      push({ title: "Booking failed", description: "Please confirm in wallet.", kind: "error" });
+                      push({ title: "Error", description: "Payment failed or rejected.", kind: "error" });
                     }
                   }}
                   disabled={!canBook || busy === `pay:${t.id}` || t.seatsRemaining <= 0}
                 >
-                  Book Now
+                  {busy === `pay:${t.id}` ? "Processing..." : "Book Now"}
                 </Button>
               </div>
             </motion.div>
@@ -210,7 +198,8 @@ export function TouristDashboard() {
         )}
       </div>
 
-      {roleBadge === "Tourist" ? <TourChatFab /> : null}
+      {/* Кнопка чата - только для туристов */}
+      {roleBadge === "Tourist" && <TourChatFab />}
     </div>
   );
 }
