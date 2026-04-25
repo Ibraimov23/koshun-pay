@@ -48,7 +48,7 @@ function CoopModal({
               onOpenCreateTour();
             }}
           >
-            {roleBadge === "Guide" ? "Go to Dashboard" : roleBadge === "Owner" ? "Owner Panel" : "Become a Guide"}
+            {roleBadge === "Guide" ? "Go to Dashboard" : "Become a Guide"}
           </Button>
         )}
       </div>
@@ -212,27 +212,6 @@ function ShellInner({ children }: { children: ReactNode }) {
             </motion.div>
           </AnimatePresence>
         </main>
-
-        {/* НИЖНЯЯ НАВИГАЦИЯ (MOBILE BOTTOM NAV) */}
-        <div className="fixed bottom-0 left-0 z-40 w-full border-t border-white/5 bg-slate-950/80 p-2 pb-6 backdrop-blur-xl md:hidden">
-          <div className="flex items-center justify-around">
-            <button className="flex flex-col items-center gap-1 p-2 text-emerald-500">
-              <span className="text-xl">🏔️</span>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">Explore</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 p-2 text-slate-500">
-              <span className="text-xl">🎟️</span>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">My Trips</span>
-            </button>
-            <button 
-              onClick={() => setCoopOpen(true)}
-              className="flex flex-col items-center gap-1 p-2 text-slate-500"
-            >
-              <span className="text-xl">💼</span>
-              <span className="text-[10px] font-bold uppercase tracking-tighter">Partner</span>
-            </button>
-          </div>
-        </div>
 
         <CoopModal
           open={coopOpen}

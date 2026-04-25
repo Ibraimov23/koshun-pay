@@ -101,7 +101,6 @@ export function TouristDashboard() {
   const { push } = useToast();
   const {
     isConnected,
-    connect,
     roleBadge,
     networkOk,
     activeTours,
@@ -136,11 +135,6 @@ export function TouristDashboard() {
           <h1 className="text-3xl font-bold tracking-tight text-white">Discover Kyrgyzstan with Confidence</h1>
           <p className="text-sm text-slate-400">Verified adventures protected by smart contracts. Explore the hidden gems of the Tien Shan mountains with an AI-powered guide</p>
         </div>
-        {!isConnected && (
-          <Button variant="pill" onClick={connect} className="bg-emerald-500 text-slate-950">
-            Connect
-          </Button>
-        )}
       </div>
 
       {!networkOk && isConnected && (
@@ -253,13 +247,13 @@ export function TouristDashboard() {
 
                     {hasOrder && isCompleted && (
                       <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 py-3 text-center text-xs font-semibold text-blue-300">
-                        Trip completed. See full history in My Trips.
+                        Trip completed
                       </div>
                     )}
 
                     {hasOrder && !isPaid && !isCompleted && (
                       <div className="rounded-2xl border border-slate-700 bg-slate-800/40 px-4 py-3 text-center text-xs font-semibold text-slate-300">
-                        Booking already exists for this tour.
+                        Booking already exists for this tour
                       </div>
                     )}
                   </div>

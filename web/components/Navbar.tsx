@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { useKoshun } from "@/components/KoshunProvider";
 import { shortAddr } from "@/lib/useKoshunPay";
@@ -14,12 +15,18 @@ function cn(...xs: Array<string | undefined | false | null>) {
 export function Navbar({ onCooperation }: { onCooperation: () => void }) {
   const p = usePathname();
   const { isConnected, connect, address, walletBal, token, roleBadge, networkOk } = useKoshun();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const tabs: Array<{ href: string; label: string; show: boolean }> = [
     { href: "/", label: "Home", show: true },
     { href: "/trips", label: "My Trips", show: roleBadge === "Tourist" },
     { href: "/tours", label: "My Tours", show: roleBadge === "Guide" }
   ];
+  const visibleTabs = tabs.filter((t) => t.show);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [p]);
 
   return (
     <div className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/40 backdrop-blur">
@@ -40,10 +47,8 @@ export function Navbar({ onCooperation }: { onCooperation: () => void }) {
           </div>
         </div>
 
-        <div className="flex flex-1 items-center gap-1 overflow-x-auto rounded-full border border-slate-800 bg-slate-950/30 p-1 md:flex-none">
-          {tabs
-            .filter((t) => t.show)
-            .map((t) => {
+        <div className="hidden flex-1 items-center gap-1 overflow-x-auto rounded-full border border-slate-800 bg-slate-950/30 p-1 md:flex md:flex-none">
+          {visibleTabs.map((t) => {
               const active = p === t.href;
               return (
                 <Link
@@ -92,8 +97,57 @@ export function Navbar({ onCooperation }: { onCooperation: () => void }) {
               "Connect Wallet"
             )}
           </Button>
+
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-800 bg-slate-950/40 text-slate-200 transition hover:bg-slate-900/60 md:hidden"
+            aria-label="Toggle menu"
+            aria-expanded={menuOpen}
+          >
+            <span className="text-lg leading-none">{menuOpen ? "✕" : "☰"}</span>
+          </button>
         </div>
       </div>
+
+      {menuOpen && (
+        <div className="border-t border-slate-800 bg-slate-950/90 px-4 py-3 md:hidden">
+          <div className="flex flex-col gap-2">
+            {visibleTabs.map((t) => {
+              const active = p === t.href;
+              return (
+                <Link
+                  key={t.href}
+                  href={t.href}
+                  className={cn(
+                    "rounded-xl px-4 py-2 text-sm font-medium transition",
+                    active ? "bg-slate-800/70 text-slate-100" : "bg-slate-900/50 text-slate-300"
+                  )}
+                >
+                  {t.label}
+                </Link>
+              );
+            })}
+
+            <button
+              onClick={onCooperation}
+              className="rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-2 text-left text-sm font-medium text-slate-200"
+            >
+              Cooperation
+            </button>
+
+            {roleBadge ? (
+              <div className="mt-1 flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 text-xs text-slate-200">
+                <div className="h-5 w-5 overflow-hidden rounded-full shadow-[0_0_14px_rgba(16,185,129,0.45)]">
+                  <Image src="/koshun-logo.png" alt="Koshun logo" width={20} height={20} className="h-full w-full object-cover saturate-125 contrast-110" />
+                </div>
+                <span>{roleBadge}</span>
+                <span className="text-slate-500">·</span>
+                <span className={networkOk ? "text-emerald-300" : "text-red-300"}>{networkOk ? "Sepolia" : "Wrong net"}</span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
