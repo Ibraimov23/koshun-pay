@@ -40,7 +40,7 @@ function CoopModal({
           </p>
         </div>
         
-        {roleBadge !== "GOS" && (
+        {roleBadge !== "GOS" && roleBadge !== "Owner" && (
           <Button
             className="w-full h-12 rounded-2xl bg-emerald-500 text-slate-950 font-bold"
             onClick={() => {
@@ -48,7 +48,7 @@ function CoopModal({
               onOpenCreateTour();
             }}
           >
-            {roleBadge === "Guide" ? "Go to Dashboard" : "Become a Guide"}
+            {roleBadge === "Guide" ? "Go to Dashboard" : roleBadge === "Owner" ? "Owner Panel" : "Become a Guide"}
           </Button>
         )}
       </div>
@@ -75,7 +75,7 @@ function CreateTourModal({ open, onClose }: { open: boolean; onClose: () => void
 
   const canSubmit = useMemo(() => {
     if (!isConnected || !networkOk) return false;
-    if (roleBadge === "GOS") return false;
+    if (roleBadge === "GOS" || roleBadge === "Owner") return false;
     return Boolean(s.header && s.description && imageFile && s.phone && s.price && Number(s.seatsTotal) > 0);
   }, [isConnected, networkOk, roleBadge, s, imageFile]);
 

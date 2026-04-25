@@ -7,7 +7,7 @@ import { useWallet } from "@/lib/useWallet";
 export type TokenMeta = { symbol: string; decimals: number };
 
 export type Role = "DISCONNECTED" | "TOURIST" | "GUIDE" | "GOS" | "OWNER";
-export type RoleBadge = "Tourist" | "Guide" | "GOS";
+export type RoleBadge = "Tourist" | "Guide" | "GOS" | "Owner";
 
 export type TourView = {
   id: number;
@@ -80,6 +80,7 @@ export function useKoshunPay() {
   const [isGuideVerified, setIsGuideVerified] = useState(false);
   const [isTouristVerified, setIsTouristVerified] = useState(false);
   const [isGosVerified, setIsGosVerified] = useState(false);
+  const [isOwnerVerified, setIsOwnerVerified] = useState(false);
 
   const [toursById, setToursById] = useState<Record<number, TourView>>({});
   const [hasLoadedTours, setHasLoadedTours] = useState(false);
@@ -95,7 +96,7 @@ export function useKoshunPay() {
   const [guideTourIds, setGuideTourIds] = useState<number[]>([]);
   const [hasLoadedGuideTours, setHasLoadedGuideTours] = useState(false);
 
-  const [balances, setBalances] = useState<{ guide?: string; gos?: string }>({});
+  const [balances, setBalances] = useState<{ guide?: string; gos?: string; reserve?: string }>({});
   const [walletBal, setWalletBal] = useState<string | null>(null);
 
   const loadingRef = useRef({
@@ -141,10 +142,11 @@ export function useKoshunPay() {
       setIsGuideVerified(isGuide);
       setIsTouristVerified(isTourist);
       setIsGosVerified(isGos);
+      setIsOwnerVerified(isOwner);
 
       const nextRole: Role = isOwner ? "OWNER" : isGos ? "GOS" : isGuide ? "GUIDE" : isTourist ? "TOURIST" : "TOURIST";
       setRole(nextRole);
-      setRoleBadge(nextRole === "GOS" ? "GOS" : nextRole === "GUIDE" || nextRole === "OWNER" ? "Guide" : "Tourist");
+      setRoleBadge(nextRole === "OWNER" ? "Owner" : nextRole === "GOS" ? "GOS" : nextRole === "GUIDE" ? "Guide" : "Tourist");
       setHasLoadedRole(true);
     } finally {
       loadingRef.current.meta = false;
@@ -253,13 +255,15 @@ export function useKoshunPay() {
     if (!contractRO || !address) return;
     loadingRef.current.balances = true;
     try {
-      const [guideBal, gosBal] = await Promise.all([
+      const [guideBal, gosBal, reserveBal] = await Promise.all([
         contractRO.guideBalance(address),
-        contractRO.gosBalance()
+        contractRO.gosBalance(),
+        contractRO.reserveBalance()
       ]);
       setBalances({
         guide: formatUnits(guideBal as unknown as bigint, token.decimals),
-        gos: formatUnits(gosBal as unknown as bigint, token.decimals)
+        gos: formatUnits(gosBal as unknown as bigint, token.decimals),
+        reserve: formatUnits(reserveBal as unknown as bigint, token.decimals)
       });
     } finally {
       loadingRef.current.balances = false;
@@ -296,6 +300,7 @@ export function useKoshunPay() {
       setIsGuideVerified(false);
       setIsTouristVerified(false);
       setIsGosVerified(false);
+      setIsOwnerVerified(false);
       setToursById({});
       setHasLoadedTours(false);
       setMyOrderIds([]);
@@ -396,6 +401,19 @@ export function useKoshunPay() {
     }
   }, [provider, refreshBalances, refreshWalletBalance]);
 
+  const withdrawReserve = useCallback(async () => {
+    if (!provider) return;
+    setBusy("withdrawReserve");
+    try {
+      const contractRW = await getKoshunPayContractRW(provider);
+      const tx = await contractRW.withdrawReserve();
+      await tx.wait();
+      await Promise.all([refreshBalances(), refreshWalletBalance()]);
+    } finally {
+      setBusy(null);
+    }
+  }, [provider, refreshBalances, refreshWalletBalance]);
+
   const transferBooking = useCallback(
     async (orderId: number, newOwner: string) => {
       if (!provider) return;
@@ -446,6 +464,7 @@ export function useKoshunPay() {
     isGuideVerified,
     isTouristVerified,
     isGosVerified,
+    isOwnerVerified,
     gosAddr,
     ownerAddr,
 
@@ -471,6 +490,7 @@ export function useKoshunPay() {
     createTour,
     withdrawGuide,
     withdrawGos,
+    withdrawReserve,
     transferBooking,
     confirmPayment,
 
